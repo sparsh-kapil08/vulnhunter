@@ -45,5 +45,6 @@ async function startServer() {
 }
 
 export { app };
+export default app;
 
 if (!process.env.VERCEL) startServer();
