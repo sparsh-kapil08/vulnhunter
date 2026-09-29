@@ -29,7 +29,7 @@ export async function askGemini(prompt) {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: buildGeminiSystemInstruction() }] },
           contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 30000) }] }],
-          generationConfig: { temperature: 0.35, maxOutputTokens: 900 }
+          generationConfig: { temperature: 0.35, maxOutputTokens: 2048 }
         })
       });
       
