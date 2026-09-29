@@ -50,6 +50,27 @@ cp server/.env.example server/.env
 - **Frontend:** `npm run dev:client`
 - **Backend:** `npm run dev:server`
 
+## Vercel Deployment
+
+Deploy `client` and `server` as separate Vercel projects.
+
+### Frontend project
+
+- Root Directory: `client`
+- Framework Preset: `Vite`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Environment variable: `VITE_API_URL=https://server-ashen-eight.vercel.app/api`
+
+### Backend project
+
+- Root Directory: `server`
+- Framework Preset: `Express`
+- Build Command: use Vercel's default
+- Environment variables: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `DATABASE_URL`, and `FRONTEND_URL=https://<your-frontend-domain>`
+
+The backend exports the Express app for Vercel Functions and only opens a local port outside Vercel. Configure Supabase/Postgres for durable sessions; the in-memory session map is a local fallback and does not survive serverless instance changes.
+
 ---
 
 ## ⚖️ Hackathon Organizer Notice

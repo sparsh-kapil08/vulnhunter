@@ -11,8 +11,9 @@ dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || path.resolve(serverDir, 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const allowedOrigins = (process.env.FRONTEND_URL || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 
-app.use(cors());
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : true }));
 app.use(express.json({ limit: '5mb' }));
 
 // Mount API routes
@@ -43,4 +44,6 @@ async function startServer() {
   });
 }
 
-startServer();
+export { app };
+
+if (!process.env.VERCEL) startServer();

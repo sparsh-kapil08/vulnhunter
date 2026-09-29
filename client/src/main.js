@@ -1,5 +1,7 @@
 const app = document.querySelector('#app');
-const API = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+const isLocal = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+const defaultApi = isLocal ? `${window.location.protocol}//${window.location.hostname}:5000/api` : 'https://server-ashen-eight.vercel.app/api';
+const API = (import.meta.env.VITE_API_URL || defaultApi).replace(/\/$/, '');
 let currentSession = null;
 
 app.innerHTML = `
@@ -67,7 +69,7 @@ function renderHistory(items) {
   history.innerHTML = items.length ? items.map((item) => `<button class="history-item ${currentSession?.id === item.id ? 'active' : ''}" data-id="${item.id}"><span class="history-icon">⌁</span><span><b>${escapeHtml(item.challengeName || 'Untitled investigation')}</b><small>${new Date(item.createdAt).toLocaleDateString()}</small></span></button>`).join('') : '<div class="history-empty">No investigations yet.</div>';
   history.querySelectorAll('[data-id]').forEach((button) => button.addEventListener('click', () => loadSession(button.dataset.id)));
 }
-async function loadHistory() { try { const response = await fetch(`${API}/sessions`); if (response.ok) renderHistory(await response.json()); } catch { showToast('API is offline. Start the server on port 5000.'); } }
+async function loadHistory() { try { const response = await fetch(`${API}/sessions`); if (response.ok) renderHistory(await response.json()); } catch { showToast('API is offline. Check the configured backend URL.'); } }
 async function checkBackend() {
   const status = document.querySelector('#connection');
   try {
