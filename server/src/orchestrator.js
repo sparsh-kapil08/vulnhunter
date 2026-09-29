@@ -194,6 +194,15 @@ export async function answerChat(content, onMessage, history = [], attachments =
   emit({ role: 'tool', kind: 'tool_result', toolName: 'fetch_authorized_url', toolResult: { ...fetched, text: undefined }, content: fetched.ok ? `Fetched ${fetched.status} ${fetched.contentType || ''} from ${fetched.url}` : fetched.error });
   if (tcpProbe) emit({ role: 'tool', kind: 'tool_result', toolName: 'probe_tcp_service', toolResult: tcpProbe, content: tcpProbe.ok ? tcpProbe.banner : tcpProbe.error });
   if (!fetched.ok) {
+    if ([401, 403].includes(fetched.status)) {
+      const blockedPageScan = grepFiles([{ name: fetched.url, content: fetched.text || '' }]);
+      const blockedSurface = inspectWebSurface(fetched.text || '', fetched.url);
+      emit({ role: 'agent', kind: 'tool_call', toolName: 'inspect_blocked_web_response', content: `Analyzing the ${fetched.status} response instead of treating it as an empty result.` });
+      emit({ role: 'tool', kind: 'tool_result', toolName: 'inspect_blocked_web_response', toolResult: { status: fetched.status, headers: fetched.headers, pageScan: blockedPageScan, webSurface: blockedSurface }, content: JSON.stringify({ status: fetched.status, headers: fetched.headers, pageScan: blockedPageScan, webSurface: blockedSurface }) });
+      const blockedReply = await geminiAnswer(`Analyze this authorized HTTPS challenge response that returned HTTP ${fetched.status}. Do not claim the target was bypassed or exploited. Explain whether the evidence suggests authentication, authorization, a WAF/rate limit, bot protection, a missing request requirement, or a potentially interesting information disclosure. Use the response headers, visible body, forms, scripts, links, and source scan. Recommend only safe next steps such as checking the public challenge instructions, using an authorized session, or comparing documented request requirements.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user request:\n${content}\n\nURL: ${fetched.url}\nResponse headers:\n${JSON.stringify(fetched.headers)}\n\nWeb surface:\n${JSON.stringify(blockedSurface)}\n\nPage scan:\n${JSON.stringify(blockedPageScan)}\n\nResponse body excerpt:\n${fetched.text || '(empty response body)'}`);
+      emit({ role: 'agent', kind: 'chat', content: blockedReply });
+      return;
+    }
     const reply = await geminiAnswer(`Explain this failed public challenge-page retrieval and give the user a useful next step. Do not claim to have inspected the page.\n\nUser request:\n${content}\n\nFetch result:\n${fetched.error}\n\nTCP probe result:\n${JSON.stringify(tcpProbe)}`);
     emit({ role: 'agent', kind: 'chat', content: reply });
     return;

@@ -26,7 +26,14 @@ export async function fetchAuthorizedUrl(value) {
   try {
     const response = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'VulnHunter-authorized-research/1.0' } });
     const text = (await response.text()).slice(0, 120000);
-    return { ok: response.ok, status: response.status, url: response.url, contentType: response.headers.get('content-type'), text };
+    return {
+      ok: response.ok,
+      status: response.status,
+      url: response.url,
+      contentType: response.headers.get('content-type'),
+      headers: Object.fromEntries(['server', 'location', 'www-authenticate', 'content-security-policy', 'x-frame-options'].map((name) => [name, response.headers.get(name)]).filter(([, value]) => value)),
+      text
+    };
   } catch (error) {
     return { ok: false, error: error.name === 'AbortError' ? 'The URL timed out after 8 seconds.' : error.message };
   } finally {
