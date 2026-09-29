@@ -1,64 +1,10 @@
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: #213547;
-  background-color: #ffffff;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #0f172a;
-  }
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.starter-card {
-  padding: 2.5rem;
-  border-radius: 12px;
-  background: rgba(148, 163, 184, 0.08);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-}
-
-.tagline {
-  color: #64748b;
-  margin-top: -0.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.guidelines-box {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border-radius: 8px;
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.3);
-  font-size: 0.9rem;
-  color: #b45309;
-}
-
-@media (prefers-color-scheme: dark) {
-  .guidelines-box {
-    color: #fef08a;
-  }
-}
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+:root { font-family: 'Space Grotesk', sans-serif; color: #e8f1ec; background: #080d12; --ink: #e8f1ec; --muted: #84948e; --line: #23322e; --panel: #101918; --teal: #56e4ae; --blue: #8ab4ff; --red: #ff816e; font-synthesis: none; }
+* { box-sizing: border-box; } body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 85% 0, #183a32 0, transparent 31rem), #080d12; } button, textarea { font: inherit; } button { cursor: pointer; }
+.app-shell { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: 100vh; }.sidebar { display: flex; flex-direction: column; padding: 22px 15px; background: rgba(9, 15, 17, .92); border-right: 1px solid var(--line); }.side-header { display: flex; align-items: center; justify-content: space-between; padding: 0 9px 22px; }.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; letter-spacing: -.03em; }.brand-mark { display: grid; place-items: center; width: 28px; height: 28px; color: #06120d; background: var(--teal); font: 500 10px 'DM Mono'; }.icon-button { width: 29px; height: 29px; color: var(--teal); background: transparent; border: 1px solid var(--line); font-size: 21px; line-height: 1; }.new-chat { margin: 0 0 29px; padding: 12px; color: #06120d; background: var(--teal); border: 0; text-align: left; font-weight: 700; }.history-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 9px 10px; color: var(--muted); font: 10px 'DM Mono'; letter-spacing: .08em; }.history-heading button { color: var(--muted); background: transparent; border: 0; font-size: 18px; }.history { display: grid; gap: 3px; }.history-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 9px; color: var(--muted); background: transparent; border: 0; text-align: left; }.history-item:hover, .history-item.active { color: var(--ink); background: #13211e; }.history-icon { color: var(--teal); font-size: 18px; }.history-item span:last-child { display: grid; gap: 5px; min-width: 0; }.history-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }.history-item small { color: var(--muted); font: 10px 'DM Mono'; }.history-empty { padding: 14px 9px; color: #586963; font-size: 12px; }.side-footer { display: flex; gap: 8px; align-items: center; margin-top: auto; padding: 18px 9px 0; color: var(--muted); border-top: 1px solid var(--line); font: 10px 'DM Mono'; }.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px var(--teal); }
+.chat-shell { display: grid; grid-template-rows: auto 1fr auto; width: min(930px, 100%); min-height: 100vh; margin: auto; }.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 30px 42px; border-bottom: 1px solid var(--line); }.eyebrow { margin: 0 0 8px; color: var(--teal); font: 10px 'DM Mono'; letter-spacing: .12em; }.chat-header h1 { margin: 0; font-size: 19px; font-weight: 500; }.connection { color: var(--muted); font: 10px 'DM Mono'; letter-spacing: .06em; }.connection i { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--teal); }.messages { width: min(790px, calc(100% - 84px)); margin: 0 auto; padding: 44px 0 70px; overflow-y: auto; }.welcome { display: grid; justify-items: center; padding-top: 10vh; text-align: center; }.welcome-mark { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 22px; color: #06120d; background: var(--teal); font: 500 14px 'DM Mono'; }.welcome h2 { margin: 0 0 10px; font-size: 27px; letter-spacing: -.04em; }.welcome p { max-width: 430px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }.suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 29px; }.suggestions button { padding: 9px 12px; color: var(--muted); background: transparent; border: 1px solid var(--line); font-size: 11px; }.suggestions button:hover { color: var(--teal); border-color: var(--teal); }
+.message { display: flex; gap: 14px; margin: 0 0 30px; }.avatar { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; color: #06120d; background: var(--teal); font: 10px 'DM Mono'; }.user .avatar { color: var(--ink); background: #263a35; }.message-body { min-width: 0; flex: 1; }.message-meta { display: flex; gap: 10px; align-items: baseline; margin-bottom: 7px; }.message-meta b { font-size: 12px; font-weight: 600; }.message-meta time { color: var(--muted); font: 10px 'DM Mono'; }.message-content { color: #c0cdc7; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }.tool_call .message-content, .tool_result .message-content { color: var(--blue); font: 12px 'DM Mono'; }.message-content pre { max-height: 220px; margin: 0; padding: 14px; overflow: auto; color: #a6d9c5; background: #09100f; border: 1px solid var(--line); font: 11px/1.55 'DM Mono'; }.verdict-inline { display: grid; gap: 6px; margin-top: 14px; padding: 14px; border-left: 2px solid var(--red); background: rgba(255, 129, 110, .08); }.verdict-inline span { color: var(--red); font: 10px 'DM Mono'; letter-spacing: .1em; }.verdict-inline strong { color: var(--ink); font-size: 18px; text-transform: capitalize; }.verdict-inline small { color: var(--muted); font: 11px 'DM Mono'; }
+.thinking .message-meta span { color: var(--muted); font: 10px 'DM Mono'; }.thinking-dots { display: flex; gap: 5px; padding-top: 5px; }.thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); animation: thinking 1.1s infinite ease-in-out; }.thinking-dots i:nth-child(2) { animation-delay: .14s; }.thinking-dots i:nth-child(3) { animation-delay: .28s; }
+.composer { position: relative; width: min(790px, calc(100% - 84px)); margin: auto; padding: 10px 0 30px; }.composer textarea { display: block; width: 100%; min-height: 54px; max-height: 160px; padding: 16px 58px 28px 16px; color: var(--ink); background: #111e1b; border: 1px solid #314841; outline: none; resize: none; }.composer textarea:focus { border-color: var(--teal); }.composer button { position: absolute; right: 10px; top: 20px; width: 34px; height: 34px; color: #06120d; background: var(--teal); border: 0; font-size: 22px; }.composer button:disabled { opacity: .45; }.composer small { position: absolute; bottom: 16px; left: 17px; color: #5f726a; font: 9px 'DM Mono'; }.toast { position: fixed; right: 22px; bottom: 22px; padding: 12px 15px; color: var(--ink); background: #182724; border: 1px solid var(--red); opacity: 0; transform: translateY(10px); transition: .2s; }.toast.visible { opacity: 1; transform: none; }
+@media (max-width: 700px) { .app-shell { display: block; }.sidebar { min-height: auto; padding: 14px 15px; border-right: 0; border-bottom: 1px solid var(--line); }.side-header { padding-bottom: 14px; }.new-chat { margin-bottom: 12px; }.history-heading, .history { display: none; }.side-footer { display: none; }.chat-shell { min-height: calc(100vh - 119px); }.chat-header { padding: 23px 20px; }.connection { display: none; }.messages, .composer { width: calc(100% - 34px); }.messages { padding-top: 28px; }.welcome { padding-top: 8vh; }.welcome h2 { font-size: 23px; }.suggestions button { width: 100%; }.composer { padding-bottom: 20px; }.composer small { display: none; } }
+@keyframes thinking { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }

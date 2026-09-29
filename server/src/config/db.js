@@ -4,7 +4,11 @@ const { Pool } = pkg;
 export async function connectDB() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
-    console.log('[Database] No DATABASE_URL set. Running in stateless mode.');
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+      console.log('[Database] Supabase REST persistence configured.');
+    } else {
+      console.log('[Database] No DATABASE_URL or Supabase credentials set. Running without persistence.');
+    }
     return null;
   }
 
