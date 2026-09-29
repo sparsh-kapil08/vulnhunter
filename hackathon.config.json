@@ -1,0 +1,18 @@
+{
+  "projectName": "vulnhunter",
+  "teamName": "Dotenv",
+  "tagline": "An agentic AI that hunts, verifies, and explains real exploits.",
+  "teamMembers": [
+    "Sparsh",
+    "Tanishq"
+  ],
+  "problemStatement": "Security scanners and CTF tools return a verdict or a raw log, but not the reasoning behind it — students see \"vulnerable\" without ever seeing why, so the underlying skill never actually transfers, and real-world exploit-finding stays a black box even after using the tool.",
+  "frontend": "Vanilla HTML/JS",
+  "backend": "Express",
+  "database": "PostgreSQL",
+  "authentication": "JWT",
+  "addons": [
+    "Docker setup"
+  ],
+  "installDeps": true
+}

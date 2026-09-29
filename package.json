@@ -1,0 +1,22 @@
+{
+  "name": "vulnhunter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Official Hackathon Starter Template",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "build:client": "npm run build --workspace=client",
+    "start:server": "npm run start --workspace=server"
+  },
+  "keywords": [
+    "hackathon",
+    "starter",
+    "boilerplate"
+  ],
+  "license": "MIT"
+}
