@@ -8,3 +8,13 @@
 .composer { position: relative; width: min(790px, calc(100% - 84px)); margin: auto; padding: 10px 0 30px; }.composer textarea { display: block; width: 100%; min-height: 54px; max-height: 160px; padding: 16px 58px 28px 16px; color: var(--ink); background: #111e1b; border: 1px solid #314841; outline: none; resize: none; }.composer textarea:focus { border-color: var(--teal); }.composer button { position: absolute; right: 10px; top: 20px; width: 34px; height: 34px; color: #06120d; background: var(--teal); border: 0; font-size: 22px; }.composer button:disabled { opacity: .45; }.composer small { position: absolute; bottom: 16px; left: 17px; color: #5f726a; font: 9px 'DM Mono'; }.toast { position: fixed; right: 22px; bottom: 22px; padding: 12px 15px; color: var(--ink); background: #182724; border: 1px solid var(--red); opacity: 0; transform: translateY(10px); transition: .2s; }.toast.visible { opacity: 1; transform: none; }
 @media (max-width: 700px) { .app-shell { display: block; }.sidebar { min-height: auto; padding: 14px 15px; border-right: 0; border-bottom: 1px solid var(--line); }.side-header { padding-bottom: 14px; }.new-chat { margin-bottom: 12px; }.history-heading, .history { display: none; }.side-footer { display: none; }.chat-shell { min-height: calc(100vh - 119px); }.chat-header { padding: 23px 20px; }.connection { display: none; }.messages, .composer { width: calc(100% - 34px); }.messages { padding-top: 28px; }.welcome { padding-top: 8vh; }.welcome h2 { font-size: 23px; }.suggestions button { width: 100%; }.composer { padding-bottom: 20px; }.composer small { display: none; } }
 @keyframes thinking { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+.composer textarea { padding-left: 54px; }
+.composer .attach-button { position: absolute; top: 20px; left: 10px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--teal); border: 1px solid var(--line); font-size: 20px; cursor: pointer; }
+.attach-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.attach-button.disabled { pointer-events: none; opacity: .45; }
+.composer small { max-width: calc(100% - 34px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer .attachment-name { color: var(--teal); }
+.attachment-preview { margin-top: 8px; }
+.attachment-preview summary { width: fit-content; color: var(--teal); cursor: pointer; font: 11px 'DM Mono'; }
+.attachment-preview pre { max-width: 100%; }
+@media (max-width: 700px) { .composer .attachment-name { display: block; } }

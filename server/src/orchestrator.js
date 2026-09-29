@@ -1,4 +1,4 @@
-import { fetchAuthorizedUrl, probeTcpService, searchSource, inspectWebSurface, inspectBinary, craftPayload } from './tools.js';
+import { fetchAuthorizedUrl, probeTcpService, searchSource, grepFiles, isBlockedHost, parseRsaParameters, decryptRsaChallenge, decryptRsaWithFactors, lookupRsaFactors, inspectWebSurface, inspectBinary, craftPayload } from './tools.js';
 import { askGemini } from './gemini.js';
 
 export function looksLikeUrl(value = '') {
@@ -15,13 +15,14 @@ function formatHistory(history = [], currentContent = '') {
   const lines = history
     .filter((message) => message.content && message.content.trim() !== current)
     .slice(-24)
-    .map((message) => `${message.role}${message.kind ? ` (${message.kind})` : ''}: ${message.content}`);
-  return lines.length ? lines.join('\n') : '(no earlier messages)';
+    .map((message) => `${message.role}${message.kind ? ` (${message.kind})` : ''}: ${message.content}${(message.attachments || (message.attachment ? [message.attachment] : [])).map((file) => `\nAttachment (${file.name}):\n${file.content}`).join('')}`);
+  return lines.length ? lines.join('\n').slice(-8000) : '(no earlier messages)';
 }
 
 export function looksLikeChallengeEvidence(value = '') {
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 20000) return false;
+  if (parseRsaParameters(trimmed)) return true;
   if (looksLikeUrl(trimmed)) return true;
   if (parseServiceTarget(trimmed)) return true;
 
@@ -49,9 +50,25 @@ export function looksLikeChallengeEvidence(value = '') {
   return false;
 }
 
+function isPythonChallengeRequest(value = '') {
+  return /\b(?:run|execute|simulate|solve|analyze|analyse)\b/i.test(value) &&
+    /\b(?:python|script|code)\b/i.test(value) &&
+    /\b(?:flag|binary|decimal|challenge)\b/i.test(value);
+}
+
 function parseServiceTarget(value = '') {
   const match = value.match(/(?:\bnc(?:\s+-[^\s]+)*|\bconnect(?:\s+to)?|\bhost)\s+(?:https?:\/\/)?([a-z0-9.-]+)(?:\s+(?:at\s+)?(?:port\s+)?|\s*:)\s*(\d{1,5})\b/i) || value.match(/\b([a-z0-9.-]+)\s*:\s*(\d{1,5})\b/i);
   return match && Number(match[2]) <= 65535 ? { host: match[1], port: Number(match[2]) } : null;
+}
+
+export function parseTcpUrlTarget(value = '') {
+  let parsed;
+  try { parsed = new URL(value); } catch { return null; }
+  if (!['http:', 'https:'].includes(parsed.protocol) || isBlockedHost(parsed.hostname)) return null;
+  const explicitPort = parsed.port || value.match(/^https?:\/\/(?:[^/@]+@)?(?:\[[^\]]+\]|[^/:?#]+):(\d+)(?:[/?#]|$)/i)?.[1];
+  const port = Number(explicitPort);
+  if (!explicitPort || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return { host: parsed.hostname.replace(/^\[|\]$/g, ''), port };
 }
 
 function decodeNumericBanner(value = '') {
@@ -60,32 +77,58 @@ function decodeNumericBanner(value = '') {
   return tokens.map((token) => String.fromCharCode(Number(token))).join('');
 }
 
-export function buildGeneralChatReply(content = '') {
-  const text = (content || '').trim();
-  if (!text) return 'I am here to assist you with authorized security analysis, CTF evidence examination, or general technical questions. How can I help?';
-  return `I have analyzed your query: "${text}". Please provide any relevant context, source code, binary paths, or service information so I can assist you further.`;
+async function geminiAnswer(prompt) {
+  const response = await askGemini(prompt);
+  if (response && !response.startsWith('[Gemini API')) return response.trim();
+  return `Gemini did not provide a reasoning response. ${response || 'Check that GEMINI_API_KEY is configured on the server and retry.'}`;
 }
 
-function localChatReply(content, scan) {
-  if (scan.matches.length) {
-    const evidence = scan.matches.slice(0, 3).map((match) => `line ${match.line}: ${match.reason}`).join('; ');
-    return `Static analysis detected ${scan.matches.length} pattern(s): ${evidence}. Please provide target artifacts or service details to analyze this further.`;
+export function resolveRsaChallenge(content = '', files = [], history = []) {
+  const currentEvidence = [content, ...files.map((file) => file.content)].join('\n');
+  const currentParameters = parseRsaParameters(currentEvidence);
+  if (currentParameters) return { parameters: currentParameters, evidence: currentEvidence };
+  if (!/\b(?:rsa|ciphertext|modulus|decrypt)\b/i.test(content)) return null;
+
+  const historicalEvidence = history
+    .filter((message) => message.role === 'user')
+    .flatMap((message) => [
+      message.content || '',
+      ...(message.attachments || (message.attachment ? [message.attachment] : [])).map((file) => file.content || '')
+    ])
+    .filter(Boolean);
+  for (let start = historicalEvidence.length - 1; start >= 0; start--) {
+    const evidence = historicalEvidence.slice(start).join('\n').slice(-20000);
+    const parameters = parseRsaParameters(evidence);
+    if (parameters) return { parameters, evidence };
   }
-  return buildGeneralChatReply(content);
+  return null;
 }
 
-export async function answerChat(content, onMessage, history = []) {
+export async function answerChat(content, onMessage, history = [], attachments = []) {
   const emit = (message) => onMessage({ role: message.role, ...message });
   const normalized = (content || '').trim();
-  const url = extractUrl(normalized);
+  const files = Array.isArray(attachments) ? attachments : (attachments ? [attachments] : []);
+  const url = files.length ? null : extractUrl(normalized);
+  const asksForTcpProbe = /\b(?:nc|netcat|tcp|banner)\b/i.test(normalized) || (/\bport\b/i.test(normalized) && /\b(?:probe|check|test|connect)\b/i.test(normalized));
+  const urlTcpTarget = url && asksForTcpProbe ? parseTcpUrlTarget(url) : null;
   const serviceTarget = parseServiceTarget(normalized);
   const conversationHistory = formatHistory(history, normalized);
+  const rsaChallenge = resolveRsaChallenge(normalized, files, history);
 
   if (!url) {
-    const isChallenge = looksLikeChallengeEvidence(normalized) || Boolean(serviceTarget);
+    const isChallenge = files.length > 0 || Boolean(rsaChallenge) || looksLikeChallengeEvidence(normalized) || Boolean(serviceTarget);
     if (!isChallenge) {
-      const directReply = await askGemini(`You are a conversational assistant. Answer the user normally and helpfully based on their actual question. Do not rely on fixed keyword patterns. Treat this as a general chat request unless the user provides actual challenge evidence such as a URL, source snippet, binary path, or target and port.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user message:\n${normalized}`);
-      const answer = directReply && directReply.trim() ? directReply : buildGeneralChatReply(normalized);
+      const answer = await geminiAnswer(`You are a conversational assistant. Answer the user normally and helpfully based on their actual question. Do not rely on fixed keyword patterns. Treat this as a general chat request unless the user provides actual challenge evidence such as a URL, source snippet, binary path, or target and port.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user message:\n${normalized}`);
+      emit({ role: 'agent', kind: 'chat', content: answer });
+      return;
+    }
+    if (isPythonChallengeRequest(normalized)) {
+      const attachmentEvidence = files.map((file) => `\n\nAttached file (${file.name}):\n${file.content}`).join('');
+      const pythonFiles = files.length ? files : [{ name: 'pasted-python-source', content: normalized }];
+      const localScan = grepFiles(pythonFiles);
+      emit({ role: 'agent', kind: 'tool_call', toolName: 'grep_files', content: `Locally scanning ${pythonFiles.length} Python source input(s) for embedded flags and secret-like strings.` });
+      emit({ role: 'tool', kind: 'tool_result', toolName: 'grep_files', toolResult: localScan, content: JSON.stringify(localScan) });
+      const answer = await geminiAnswer(`Solve the user's Python CTF challenge by carefully reasoning from the supplied source. Explain the relevant program behavior and give the requested result if it can be derived. Do not claim to have executed code; if a random value is chosen at runtime, distinguish that from values determinable from the source.\n\nPrevious conversation:\n${conversationHistory}\n\nUser request and source:\n${normalized}${attachmentEvidence}\n\nLocal flag and secret scan:\n${JSON.stringify(localScan)}`);
       emit({ role: 'agent', kind: 'chat', content: answer });
       return;
     }
@@ -99,36 +142,70 @@ export async function answerChat(content, onMessage, history = []) {
       const flag = banner.match(/[A-Za-z0-9_-]+\{[^}\n]{1,200}\}/)?.[0];
       const positiveFlagLine = banner.split(/\r?\n/).map((line) => line.trim()).find((line) => /\bflag\b/i.test(line) && !(/\bnot\b/i.test(line) || /\b(?:don't|dont)\b/i.test(line)));
       const flagEvidence = flag || positiveFlagLine;
-      const reply = await askGemini(`You are reasoning on an authorized CTF service. Listen to the user's exact wording and the target details first. Do not stop at the first banner or the first failed hypothesis. If the output is noisy, encoded, or contains decoys, search for alternate evidence, hidden data, repeated clues, or a safe follow-up interaction requirement.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user request / context:\n${content}\n\nTarget: ${serviceTarget.host}:${serviceTarget.port}\nObserved output:\n${banner || probe.error}\n\nImportant: We are not exploiting anything. We are gathering evidence and looking for safe, authorized next steps. If this first read is not conclusive, explain what alternative evidence path should be tried next.`);
-      emit({ role: 'agent', kind: 'chat', content: reply || (probe.ok ? `I connected to ${serviceTarget.host}:${serviceTarget.port} and captured the process output.\n\n${flagEvidence ? `Flag candidate found: ${flagEvidence}` : 'No positive flag line was found in the captured output.'}\n\nI did not send a payload.` : `I could not read ${serviceTarget.host}:${serviceTarget.port}: ${probe.error}`) });
+      const reply = await geminiAnswer(`You are reasoning on an authorized CTF service. Listen to the user's exact wording and the target details first. Do not stop at the first banner or the first failed hypothesis. If the output is noisy, encoded, or contains decoys, search for alternate evidence, hidden data, repeated clues, or a safe follow-up interaction requirement.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user request / context:\n${content}\n\nTarget: ${serviceTarget.host}:${serviceTarget.port}\nObserved output:\n${banner || probe.error}\n\nFlag evidence from local inspection: ${flagEvidence || 'none found'}\n\nImportant: We are not exploiting anything. We are gathering evidence and looking for safe, authorized next steps. If this first read is not conclusive, explain what alternative evidence path should be tried next.`);
+      emit({ role: 'agent', kind: 'chat', content: reply });
       return;
     }
-    const localScan = searchSource(content);
-    if (localScan.matches.length) {
-      emit({ role: 'agent', kind: 'tool_call', toolName: 'search_source', content: 'Scanning the pasted snippet for input-to-sink patterns.' });
-      emit({ role: 'tool', kind: 'tool_result', toolName: 'search_source', toolResult: localScan, content: JSON.stringify(localScan) });
+    if (rsaChallenge) {
+      const { parameters: rsaParameters, evidence: rsaEvidence } = rsaChallenge;
+      emit({ role: 'agent', kind: 'hypothesis', content: 'I found RSA ciphertext, modulus, and exponent values. I will check for weak modulus factors and decrypt locally if they are recoverable.' });
+      emit({ role: 'agent', kind: 'tool_call', toolName: 'rsa_decrypt', content: 'Factoring the supplied modulus with bounded local checks, then applying RSA decryption.' });
+      let result = decryptRsaChallenge(rsaParameters);
+      if (!result.ok) {
+        emit({ role: 'agent', kind: 'tool_call', toolName: 'factor_database_lookup', content: 'Local factoring was inconclusive. Checking the public modulus against FactorDB; the ciphertext and file contents are not sent.' });
+        const factors = await lookupRsaFactors(rsaParameters.modulus);
+        if (factors) result = decryptRsaWithFactors(rsaParameters, factors, 'FactorDB');
+      }
+      emit({ role: 'tool', kind: 'tool_result', toolName: 'rsa_decrypt', toolResult: result, content: JSON.stringify(result) });
+      const reply = await geminiAnswer(`Answer the user's RSA follow-up using the verified tool output below. Explain what the values show and point out any flag candidate. Do not redo large integer arithmetic or invent a plaintext; treat the tool result as authoritative. If decryption failed, explain what the error means and suggest a practical next step. Be concise.
+
+    Earlier conversation:
+    ${conversationHistory}
+
+    Current request:
+    ${content}
+
+    RSA evidence:
+    ${rsaEvidence}
+
+    Verified RSA tool result:
+    ${JSON.stringify(result)}`);
+      emit({ role: 'agent', kind: 'chat', content: reply });
+      return;
     }
-    const reply = await askGemini(`Respond as a helpful general assistant. If the user is simply asking a question, answer directly. Only do security analysis when the user provides a real challenge artifact such as a URL, source snippet, binary path, or service target.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user message:\n${content}\n\nLocal scanner result:\n${JSON.stringify(localScan)}`);
-    emit({ role: 'agent', kind: 'chat', content: reply || localChatReply(content, localScan) });
+    const source = files.length ? '' : content;
+    const localScan = files.length ? grepFiles(files) : searchSource(source);
+    if (localScan.matches?.length || files.length) {
+      emit({ role: 'agent', kind: 'tool_call', toolName: files.length ? 'grep_files' : 'search_source', content: files.length ? `Searching ${files.length} attached file(s) for flag candidates, likely secrets, and source-risk patterns.` : 'Scanning the pasted snippet for input-to-sink patterns.' });
+      emit({ role: 'tool', kind: 'tool_result', toolName: files.length ? 'grep_files' : 'search_source', toolResult: localScan, content: JSON.stringify(localScan) });
+    }
+    const attachmentEvidence = files.map((file) => `\n\nAttached file (${file.name}${file.truncated ? ', excerpt truncated to 20,000 characters' : ''}):\n${file.content}`).join('');
+    const reply = await geminiAnswer(`Respond as a helpful assistant. Read every attached file's available content, report any flag candidates found, and for source files perform a security review grounded in the code. Distinguish confirmed issues from suspicious patterns.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user message:\n${content}${attachmentEvidence}\n\nLocal grep-style scan result:\n${JSON.stringify(localScan)}`);
+    emit({ role: 'agent', kind: 'chat', content: reply });
     return;
   }
   emit({ role: 'agent', kind: 'hypothesis', content: `I found a URL. I will retrieve its public challenge page, extract visible clues, and scan the response for leads.` });
   emit({ role: 'agent', kind: 'tool_call', toolName: 'fetch_authorized_url', content: 'Fetching the URL with an 8-second timeout and private-network protection.' });
-  const fetched = await fetchAuthorizedUrl(url);
+  if (urlTcpTarget) emit({ role: 'agent', kind: 'tool_call', toolName: 'probe_tcp_service', content: `Reading the explicitly requested TCP banner from ${urlTcpTarget.host}:${urlTcpTarget.port} without sending data.` });
+  const [fetched, tcpProbe] = await Promise.all([
+    fetchAuthorizedUrl(url),
+    urlTcpTarget ? probeTcpService(urlTcpTarget.host, urlTcpTarget.port) : Promise.resolve(null)
+  ]);
   emit({ role: 'tool', kind: 'tool_result', toolName: 'fetch_authorized_url', toolResult: { ...fetched, text: undefined }, content: fetched.ok ? `Fetched ${fetched.status} ${fetched.contentType || ''} from ${fetched.url}` : fetched.error });
+  if (tcpProbe) emit({ role: 'tool', kind: 'tool_result', toolName: 'probe_tcp_service', toolResult: tcpProbe, content: tcpProbe.ok ? tcpProbe.banner : tcpProbe.error });
   if (!fetched.ok) {
-    emit({ role: 'agent', kind: 'chat', content: `I could not retrieve that URL: ${fetched.error} Try pasting the challenge text, source, or netcat output here.` });
+    const reply = await geminiAnswer(`Explain this failed public challenge-page retrieval and give the user a useful next step. Do not claim to have inspected the page.\n\nUser request:\n${content}\n\nFetch result:\n${fetched.error}\n\nTCP probe result:\n${JSON.stringify(tcpProbe)}`);
+    emit({ role: 'agent', kind: 'chat', content: reply });
     return;
   }
+  const pageScan = grepFiles([{ name: fetched.url, content: fetched.text }]);
+  emit({ role: 'agent', kind: 'tool_call', toolName: 'grep_files', content: 'Locally searching the fetched page for flag candidates and secret-like strings.' });
+  emit({ role: 'tool', kind: 'tool_result', toolName: 'grep_files', toolResult: pageScan, content: JSON.stringify(pageScan) });
   const result = searchSource(fetched.text);
   const webSurface = inspectWebSurface(fetched.text, fetched.url);
   emit({ role: 'agent', kind: 'tool_call', toolName: 'inspect_web_surface', content: 'Inspecting forms, scripts, links, and query parameters for web-application leads.' });
   emit({ role: 'tool', kind: 'tool_result', toolName: 'inspect_web_surface', toolResult: webSurface, content: JSON.stringify(webSurface) });
-  const clues = fetched.text.match(/(?:flag|password|secret|nc\s+[^<\s]+|ssh\s+[^<\s]+)/gi)?.slice(0, 8) || [];
-  const localReply = result.matches.length
-    ? `I retrieved the page and found ${result.matches.length} suspicious code pattern(s). The strongest lead is on line ${result.matches[0].line}: ${result.matches[0].reason} Paste the netcat banner or downloadable source next so I can validate it in the sandbox.`
-    : `I retrieved the page, but it does not expose source-level vulnerability patterns. Visible leads: ${clues.length ? clues.join(', ') : 'none obvious'}. Paste the challenge output or attach the downloaded source/binary for deeper analysis.`;
-  const reply = await askGemini(`Treat this as a real investigation, not a static summary. Listen to the user’s challenge wording and follow the strongest evidence. If the page looks like a decoy or the first clue is weak, think of alternative routes: hidden encoded data, challenge type hints, command examples, or a second artifact to inspect.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user request:\n${content}\n\nURL: ${fetched.url}\nWeb surface evidence: ${JSON.stringify(webSurface)}\nLocal scanner result: ${JSON.stringify(result)}\nPage excerpt:\n${fetched.text}\n\nDo not claim exploitation. Identify the likely challenge category, the strongest clue, and the next safe evidence to collect if the first idea does not pan out. For forms, parameters, scripts, or suspicious sinks, explain what could be tested only against an authorized target.`) || localReply;
+  const reply = await geminiAnswer(`Treat this as a real investigation, not a static summary. Listen to the user’s challenge wording and follow the strongest evidence. If the page looks like a decoy or the first clue is weak, think of alternative routes: hidden encoded data, challenge type hints, command examples, or a second artifact to inspect.\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent user request:\n${content}\n\nURL: ${fetched.url}\nWeb surface evidence: ${JSON.stringify(webSurface)}\nLocal flag/secret scan: ${JSON.stringify(pageScan)}\nLocal source-pattern scan: ${JSON.stringify(result)}\nTCP banner probe: ${JSON.stringify(tcpProbe)}\nPage excerpt:\n${fetched.text}\n\nDo not claim exploitation. Identify the likely challenge category, the strongest clue, and the next safe evidence to collect if the first idea does not pan out. For forms, parameters, scripts, or suspicious sinks, explain what could be tested only against an authorized target.`);
   emit({ role: 'agent', kind: 'chat', content: reply });
 }
 
