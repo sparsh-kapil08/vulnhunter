@@ -50,9 +50,16 @@ async function readAttachment(file) {
   if (content === undefined || content.includes('\0')) content = printableStrings(bytes);
   return { name: file.name, content };
 }
+function renderMarkdown(value) {
+  return value
+    .replace(/^#{1,6}\s+(.+)$/gm, '<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>');
+}
 function formatContent(message) {
   if (message.kind === 'tool_result') return `<pre>${escapeHtml(message.content || JSON.stringify(message.toolResult, null, 2))}</pre>`;
-  const content = escapeHtml(message.content || '');
+  const escapedContent = escapeHtml(message.content || '');
+  const content = message.role === 'agent' ? renderMarkdown(escapedContent) : escapedContent;
   const attachments = message.attachments || (message.attachment ? [message.attachment] : []);
   if (!attachments.length) return content;
   return `${content}${attachments.map((attachment) => `<details class="attachment-preview"><summary>${escapeHtml(attachment.name)}${attachment.truncated ? ' · excerpt' : ''}</summary><pre>${escapeHtml(attachment.content)}</pre></details>`).join('')}`;
